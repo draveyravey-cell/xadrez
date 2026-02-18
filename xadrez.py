@@ -4,14 +4,22 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         self.columns = columns
         self.board = [[None for _ in range(columns)] for _ in range(rows)]
         self.turn = "white"
+        self.pieces = []
     def __str__(self): # mostra o tabuleiro como string para Debug
         str_board = ''
         for row in self.board:
             str_board += '|'.join(row) + '\n'
         return str_board
     def place_piece(self, piece):
+        self.pieces.append(piece)
         row, col = piece.position
         self.board[row][col] = piece
+    def remove_piece(self, position):
+        for piece in self.pieces:
+            if piece.position == position:
+                self.pieces.remove(piece)
+                return piece
+        return None
     def move_piece(self, piece, new_position):
         # Os if's abaixo verificam se o movimento é válido: se a peça pertence ao jogador que tem a vez, e se o movimento é permitido para aquela peça
         if self.turn != piece.color:
@@ -20,6 +28,11 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         if new_position not in piece.possible_moves():
             print("Movimento inválido para essa peça.")
             return False
+        
+        captured = self.remove_piece(new_position)  # remove a peça adversária, se houver
+        if captured:
+            print(f"{piece.color} capturou {captured.color} em {new_position}")
+        
         old_row, old_col = piece.position
         new_row, new_col = new_position
         # remove a peça da old_position
@@ -58,9 +71,19 @@ class Pawn(Piece):
         if 0 <= next_row < self.board.rows:
             if self.board.board[next_row][col] is None:
                 moves.append((next_row, col))
+                
+        # movimento diagonal para captura(mais anotações para os próximos if's)
+        for delta_col in [-1, 1]:
+            new_col = col + delta_col
+            """Esse if's verificam se a posição diagonal está dentro do tabuleiro e se há uma peã adversária para capturar."""
+            if 0 <= next_row < self.board.rows and 0 <= new_col < self.board.columns:
+                target_piece = self.board.board[next_row][new_col]
+                if target_piece is not None and target_piece.color != self.color:
+                    moves.append((next_row, new_col))
+        print(f"Peão {self.color} em {self.position} pode se mover para: {moves}")
         return moves
     def symbol(self):
-        return '♙' if self.color == "white" else '♟'
+        return '♟' if self.color == "white" else '♙'
 def print_board(board):
     print(" a b c d e f g h")
     print("+---------------+")
@@ -71,14 +94,18 @@ def print_board(board):
 
 """board = Board()
 pawn_white = Pawn("white", board, (6, 0))
-pawn_black = Pawn("black", board, (1, 0))
+pawn_black = Pawn("black", board, (1, 1))
 
 board.place_piece(pawn_white)
 board.place_piece(pawn_black)
 print_board(board)
 
-board.move_piece(pawn_black, (2, 0))  # ❌ erro (turno branco)
-board.move_piece(pawn_white, (5, 0))  # ✅ ok
+board.move_piece(pawn_white, (5, 0))  # 
+board.move_piece(pawn_black, (2, 1))  #
 print_board(board)
-board.move_piece(pawn_black, (2, 0))  # ✅ agora pode
-print_board(board)""" # código de teste para verificar se o peão está funcionando corretamente.
+board.move_piece(pawn_white, (4, 0))  # 
+board.move_piece(pawn_black, (3, 1))  #
+print(board.pieces)
+board.move_piece(pawn_white, (3, 1))  #
+print(board.pieces)
+print_board(board)""" # Teste de movimentação dos peões, incluindo captura. O peão branco move-se para frente, o peão preto move-se para frente, o peão branco move-se para frente novamente, o peão preto move-se para frente novamente, e finalmente o peão branco captura o peão preto movendo-se diagonalmente.
