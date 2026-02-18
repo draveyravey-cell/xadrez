@@ -5,6 +5,7 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         self.board = [[None for _ in range(columns)] for _ in range(rows)]
         self.turn = "white"
         self.pieces = []
+        self.lastest_move = [None, None, None] # essa variável armazena a última peça movida e sua nova posição, o que é necessário para implementar a captura en passant do peão
     def __str__(self): # mostra o tabuleiro como string para Debug
         str_board = ''
         for row in self.board:
@@ -42,6 +43,24 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         # atualiza a posição da peça
         piece.position = new_position
         
+        # promoção do peão(preguiça de criar uma função específica para isso, então coloquei aqui mesmo)
+        if isinstance(piece, Pawn):
+            if piece.color == "white" and piece.position[0] == 0:
+                row, col = piece.position
+                self.board[row][col] = None
+                self.remove_piece(piece.position)
+                self.place_piece(Queen("white", self, piece.position))
+            elif piece.color == "black" and piece.position[0] == 7:
+                row, col = piece.position
+                self.board[row][col] = None
+                self.remove_piece(piece.position)
+                self.place_piece(Queen("black", self, piece.position))
+                
+        self.lastest_move = {
+            "piece": piece,
+            "from": (old_row, old_col),
+            "to": new_position
+        }
         self.switch_turn()
         return True
     def switch_turn(self):
@@ -81,9 +100,40 @@ class Pawn(Piece):
                 if target_piece is not None and target_piece.color != self.color:
                     moves.append((next_row, new_col))
         print(f"Peão {self.color} em {self.position} pode se mover para: {moves}")
+        
+        # duplo movimento incial do peão
+        if self.color == 'white' and row == 6:
+            if self.board.board[row - 1][col] is None and self.board.board[row - 2][col] is None:
+                moves.append((row - 2, col))
+        elif self.color == 'black' and row == 1:
+            if self.board.board[row + 1][col] is None and self.board.board[row + 2][col] is None:
+                moves.append((row + 2, col))
+        
+        """ CAPTURA EN PASSANT:    
+        lastest_move é um dicionário que armazena informações sobre o último movimento(visitar a função move_piece para entender melhor), 
+        e aqui verificamos se o último movimento foi um duplo movimento de um peão adversário, e se o peão está na posição correta para realizar a captura en passant. 
+        Após verificar isso, adicionamos a posição de captura en passant aos movimentos possíveis do peão."""
+        if abs(self.board.lastest_move["from"][0] - self.board.lastest_move["to"][0]) == 2 and self.board.lastest_move["piece"].color != self.color:
+            if self.color == 'white' and row == 3:
+                for delta_col in [-1, 1]:
+                    new_col = col + delta_col
+                    if 0 <= new_col < self.board.columns:
+                        target_piece = self.board.board[row][new_col]
+                        if target_piece == self.board.lastest_move["piece"] and isinstance(target_piece, Pawn) and target_piece.color != self.color:
+                            moves.append((row - 1, new_col))
+            elif self.color == 'black' and row == 4:
+                for delta_col in [-1, 1]: 
+                    new_col = col + delta_col
+                    if 0 <= new_col < self.board.columns:
+                        target_piece = self.board.board[row][new_col]
+                        if target_piece == self.board.lastest_move["piece"] and isinstance(target_piece, Pawn) and target_piece.color != self.color:
+                            moves.append((row + 1, new_col))
         return moves
     def symbol(self):
         return '♟' if self.color == "white" else '♙'
+class Queen(Piece):
+    def symbol(self):
+        return '♛' if self.color == "white" else '♕'
 def print_board(board):
     print(" a b c d e f g h")
     print("+---------------+")
@@ -92,20 +142,17 @@ def print_board(board):
     print("+---------------+")
     print(" a b c d e f g h")
 
-"""board = Board()
+board = Board()
 pawn_white = Pawn("white", board, (6, 0))
-pawn_black = Pawn("black", board, (1, 1))
+pawn_black = Pawn("black", board, (4, 1))
+Pawn.possible_moves(pawn_white)
+Pawn.possible_moves(pawn_black)
 
 board.place_piece(pawn_white)
 board.place_piece(pawn_black)
-print_board(board)
 
-board.move_piece(pawn_white, (5, 0))  # 
-board.move_piece(pawn_black, (2, 1))  #
+board.move_piece(pawn_white, (4, 0))
+board.move_piece(pawn_black, (3, 1))
 print_board(board)
-board.move_piece(pawn_white, (4, 0))  # 
-board.move_piece(pawn_black, (3, 1))  #
-print(board.pieces)
-board.move_piece(pawn_white, (3, 1))  #
-print(board.pieces)
-print_board(board)""" # Teste de movimentação dos peões, incluindo captura. O peão branco move-se para frente, o peão preto move-se para frente, o peão branco move-se para frente novamente, o peão preto move-se para frente novamente, e finalmente o peão branco captura o peão preto movendo-se diagonalmente.
+print(board.lastest_move) # isso é só para mostrar qual foi a última peça movida e para onde, o que é necessário para implementar a captura en passant do peão
+Pawn.possible_moves(pawn_black)
