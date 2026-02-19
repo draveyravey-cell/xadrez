@@ -5,7 +5,9 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         self.board = [[None for _ in range(columns)] for _ in range(rows)]
         self.turn = "white"
         self.pieces = []
-        self.lastest_move = [None, None, None] # essa variável armazena a última peça movida e sua nova posição, o que é necessário para implementar a captura en passant do peão
+        self.lastest_move = None
+        self.moved = False
+        self.start = True
     def __str__(self): # mostra o tabuleiro como string para Debug
         str_board = ''
         for row in self.board:
@@ -56,11 +58,18 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
                 self.remove_piece(piece.position)
                 self.place_piece(Queen("black", self, piece.position))
                 
+        # en passant do peão(também preguiça de criar uma função específica para isso, então coloquei aqui mesmo)
+        if isinstance(piece, Pawn):
+            if old_col != new_col and captured is None: # movimento diagonal sem captura normal
+                self.board[old_row][new_col] = None # remove a peça adversária que está na coluna do movimento diagonal
+                
         self.lastest_move = {
             "piece": piece,
             "from": (old_row, old_col),
-            "to": new_position
+            "to": (new_row, new_col)
         }
+        self.moved = True
+
         self.switch_turn()
         return True
     def switch_turn(self):
@@ -99,7 +108,6 @@ class Pawn(Piece):
                 target_piece = self.board.board[next_row][new_col]
                 if target_piece is not None and target_piece.color != self.color:
                     moves.append((next_row, new_col))
-        print(f"Peão {self.color} em {self.position} pode se mover para: {moves}")
         
         # duplo movimento incial do peão
         if self.color == 'white' and row == 6:
@@ -113,21 +121,23 @@ class Pawn(Piece):
         lastest_move é um dicionário que armazena informações sobre o último movimento(visitar a função move_piece para entender melhor), 
         e aqui verificamos se o último movimento foi um duplo movimento de um peão adversário, e se o peão está na posição correta para realizar a captura en passant. 
         Após verificar isso, adicionamos a posição de captura en passant aos movimentos possíveis do peão."""
-        if abs(self.board.lastest_move["from"][0] - self.board.lastest_move["to"][0]) == 2 and self.board.lastest_move["piece"].color != self.color:
-            if self.color == 'white' and row == 3:
-                for delta_col in [-1, 1]:
-                    new_col = col + delta_col
-                    if 0 <= new_col < self.board.columns:
-                        target_piece = self.board.board[row][new_col]
-                        if target_piece == self.board.lastest_move["piece"] and isinstance(target_piece, Pawn) and target_piece.color != self.color:
-                            moves.append((row - 1, new_col))
-            elif self.color == 'black' and row == 4:
-                for delta_col in [-1, 1]: 
-                    new_col = col + delta_col
-                    if 0 <= new_col < self.board.columns:
-                        target_piece = self.board.board[row][new_col]
-                        if target_piece == self.board.lastest_move["piece"] and isinstance(target_piece, Pawn) and target_piece.color != self.color:
-                            moves.append((row + 1, new_col))
+        if self.board.moved:
+            if abs(self.board.lastest_move["from"][0] - self.board.lastest_move["to"][0]) == 2 and self.board.lastest_move["piece"].color != self.color:
+                if self.color == 'white' and row == 3:
+                    for delta_col in [-1, 1]:
+                        new_col = col + delta_col
+                        if 0 <= new_col < self.board.columns:
+                            target_piece = self.board.board[row][new_col]
+                            if target_piece == self.board.lastest_move["piece"] and isinstance(target_piece, Pawn) and target_piece.color != self.color:
+                                moves.append((row - 1, new_col))
+                elif self.color == 'black' and row == 4:
+                    for delta_col in [-1, 1]: 
+                        new_col = col + delta_col
+                        if 0 <= new_col < self.board.columns:
+                            target_piece = self.board.board[row][new_col]
+                            if target_piece == self.board.lastest_move["piece"] and isinstance(target_piece, Pawn) and target_piece.color != self.color:
+                                moves.append((row + 1, new_col))
+        print(f"Peão {self.color} em {self.position} pode se mover para: {moves}")
         return moves
     def symbol(self):
         return '♟' if self.color == "white" else '♙'
@@ -142,17 +152,24 @@ def print_board(board):
     print("+---------------+")
     print(" a b c d e f g h")
 
+
 board = Board()
+
 pawn_white = Pawn("white", board, (6, 0))
 pawn_black = Pawn("black", board, (4, 1))
-Pawn.possible_moves(pawn_white)
-Pawn.possible_moves(pawn_black)
 
 board.place_piece(pawn_white)
 board.place_piece(pawn_black)
 
-board.move_piece(pawn_white, (4, 0))
-board.move_piece(pawn_black, (3, 1))
 print_board(board)
-print(board.lastest_move) # isso é só para mostrar qual foi a última peça movida e para onde, o que é necessário para implementar a captura en passant do peão
-Pawn.possible_moves(pawn_black)
+
+print(pawn_white.possible_moves())
+board.move_piece(pawn_white, (4, 0))
+print_board(board)
+
+
+print(pawn_black.possible_moves())
+
+board.move_piece(pawn_black, (5, 0))
+print_board(board)
+
