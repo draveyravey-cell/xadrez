@@ -8,6 +8,10 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         self.lastest_move = None
         self.moved = False
         self.start = True
+        self.attacked_squares = {
+            "white": set(),
+            "black": set()
+        }
     def __str__(self): # mostra o tabuleiro como string para Debug
         str_board = ''
         for row in self.board:
@@ -21,8 +25,17 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         for piece in self.pieces:
             if piece.position == position:
                 self.pieces.remove(piece)
+                row, col = position
+                self.board[row][col] = None
                 return piece
         return None
+    def update_attacked_squares(self):
+        self.attacked_squares["white"].clear()
+        self.attacked_squares["black"].clear()
+
+        for piece in self.pieces:
+            for sq in piece.attack_squares():
+                self.attacked_squares[piece.color].add(sq)
     def move_piece(self, piece, new_position):
         # Os if's abaixo verificam se o movimento é válido: se a peça pertence ao jogador que tem a vez, e se o movimento é permitido para aquela peça
         if self.turn != piece.color:
@@ -61,7 +74,7 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
         # en passant do peão(também preguiça de criar uma função específica para isso, então coloquei aqui mesmo)
         if isinstance(piece, Pawn):
             if old_col != new_col and captured is None: # movimento diagonal sem captura normal
-                self.board[old_row][new_col] = None # remove a peça adversária que está na coluna do movimento diagonal
+                self.remove_piece((old_row, new_col)) # remove o peão adversário que foi capturado en passant com a função de remover peça, usando a posição do peão adversário que foi capturado en passant (que está na mesma linha do peão que se moveu, mas na coluna do movimento diagonal)
                 
         self.lastest_move = {
             "piece": piece,
@@ -69,7 +82,7 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
             "to": (new_row, new_col)
         }
         self.moved = True
-
+        self.update_attacked_squares()
         self.switch_turn()
         return True
     def switch_turn(self):
@@ -84,25 +97,48 @@ class Piece: # Piece é a super classe motor de todas as peças. Ela apenas real
         #return f"{self.name}" | retirado para evitar confusão, Piece agora é o motor de todas as peças, então o nome é definido nas subclasses
     def possible_moves(self):
         return []
+    def attack_squares(self):
+        return []
     def ray_moves(self, directions):
         moves = []
         row, col = self.position
-        for delta_row, delta_col in directions:
-            new_row, new_col = row + delta_row, col + delta_col
-            while 0 <= new_row < self.board.rows and 0 <= new_col < self.board.columns:
-                target_piece = self.board.board[new_row][new_col]
-                if target_piece is None:
-                    moves.append((new_row, new_col))
-                elif target_piece.color != self.color:
-                    moves.append((new_row, new_col))
+
+        for dr, dc in directions:
+            r, c = row + dr, col + dc
+            while 0 <= r < self.board.rows and 0 <= c < self.board.columns:
+                target = self.board.board[r][c]
+                if target is None:
+                    moves.append((r, c))
+                elif target.color != self.color:
+                    moves.append((r, c))
                     break
                 else:
                     break
-                new_row += delta_row
-                new_col += delta_col
+                r += dr
+                c += dc
+
         return moves
+    def ray_attacks(self, directions):
+        attacks = set()
+        row, col = self.position
+
+        for dr, dc in directions:
+            r, c = row + dr, col + dc
+            while 0 <= r < self.board.rows and 0 <= c < self.board.columns:
+                attacks.add((r, c))
+                if self.board.board[r][c] is not None:
+                    break
+                r += dr
+                c += dc
+
+        return attacks
+
+
         
 class Pawn(Piece):
+    def __init__(self, color, board, position):
+        super().__init__(color, board, position)
+        self.PAWN_ATTACKS = [(-1, -1), (-1, 1)] if color == "white" else [(1, -1), (1, 1)]
     def possible_moves(self):
         moves = []
         row, col = self.position
@@ -157,6 +193,18 @@ class Pawn(Piece):
                                 moves.append((row + 1, new_col))
         print(f"Peão {self.color} em {self.position} pode se mover para: {moves}")
         return moves
+    def attack_squares(self):
+        attacks = set()
+        row, col = self.position
+
+        deltas = [(-1, -1), (-1, 1)] if self.color == "white" else [(1, -1), (1, 1)]
+
+        for dr, dc in deltas:
+            r, c = row + dr, col + dc
+            if 0 <= r < self.board.rows and 0 <= c < self.board.columns:
+                attacks.add((r, c))
+
+        return attacks
     def symbol(self):
         return '♟' if self.color == "white" else '♙'
 class Rook(Piece):
@@ -164,12 +212,15 @@ class Rook(Piece):
         return self.ray_moves([(1,0), (-1,0), (0,1), (0,-1)])
     def symbol(self):
         return '♜' if self.color == "white" else '♖'
+    
 
 class Bishop(Piece):
     def possible_moves(self):
         return self.ray_moves([(1,1), (1,-1), (-1,1), (-1,-1)])
     def symbol(self):
         return '♝' if self.color == "white" else '♗'
+    
+    
 
 class Queen(Piece):
     def possible_moves(self):
@@ -179,7 +230,6 @@ class Queen(Piece):
         ])
     def symbol(self):
         return '♛' if self.color == "white" else '♕'
-
     
 
 def print_board(board):
@@ -190,178 +240,3 @@ def print_board(board):
     print("+---------------+")
     print(" a b c d e f g h")
 
-
-print("\n==============================")
-print("TESTE 1 — PEÃO: MOVIMENTO SIMPLES E DUPLO")
-print("==============================")
-
-board = Board()
-
-pw = Pawn("white", board, (6, 4))
-board.place_piece(pw)
-
-print_board(board)
-print("Esperado: (5,4) e (4,4)")
-print(pw.possible_moves())
-
-board.move_piece(pw, (4, 4))
-print_board(board)
-
-
-print("\n==============================")
-print("TESTE 2 — PEÃO: BLOQUEIO FRONTAL")
-print("==============================")
-
-board = Board()
-
-pw = Pawn("white", board, (6, 4))
-pb = Pawn("black", board, (5, 4))
-
-board.place_piece(pw)
-board.place_piece(pb)
-
-print_board(board)
-print("Esperado: sem movimentos")
-print(pw.possible_moves())
-
-
-print("\n==============================")
-print("TESTE 3 — PEÃO: CAPTURA DIAGONAL")
-print("==============================")
-
-board = Board()
-
-pw = Pawn("white", board, (6, 4))
-pb = Pawn("black", board, (5, 5))
-
-board.place_piece(pw)
-board.place_piece(pb)
-
-print_board(board)
-print("Esperado: captura em (5,5)")
-print(pw.possible_moves())
-
-board.move_piece(pw, (5, 5))
-print_board(board)
-
-
-print("\n==============================")
-print("TESTE 4 — EN PASSANT")
-print("==============================")
-
-board = Board()
-
-pw = Pawn("white", board, (6, 3))
-pb = Pawn("black", board, (4, 4))
-
-board.place_piece(pw)
-board.place_piece(pb)
-
-print_board(board)
-
-board.move_piece(pw, (4, 3))  # duplo
-print_board(board)
-
-print("Esperado: en passant disponível (5,3)")
-print(pb.possible_moves())
-
-board.move_piece(pb, (5, 3))
-print_board(board)
-
-
-print("\n==============================")
-print("TESTE 5 — TORRE: RAY CAST + BLOQUEIO")
-print("==============================")
-
-board = Board()
-
-rw = Rook("white", board, (4, 4))
-pw = Pawn("white", board, (4, 6))
-pb = Pawn("black", board, (4, 2))
-
-board.place_piece(rw)
-board.place_piece(pw)
-board.place_piece(pb)
-
-print_board(board)
-print("Esperado: torre para até (4,5) e captura em (4,2)")
-print(rw.possible_moves())
-
-
-print("\n==============================")
-print("TESTE 6 — BISPO: DIAGONAIS")
-print("==============================")
-
-board = Board()
-
-bw = Bishop("white", board, (4, 4))
-pb = Pawn("black", board, (2, 2))
-
-board.place_piece(bw)
-board.place_piece(pb)
-
-print_board(board)
-print("Esperado: diagonal até (2,2)")
-print(bw.possible_moves())
-
-
-print("\n==============================")
-print("TESTE 7 — RAINHA: TORRE + BISPO")
-print("==============================")
-
-board = Board()
-
-qw = Queen("white", board, (4, 4))
-pb = Pawn("black", board, (4, 7))
-pw = Pawn("white", board, (2, 4))
-
-board.place_piece(qw)
-board.place_piece(pb)
-board.place_piece(pw)
-
-print_board(board)
-print("Esperado: captura em (4,7), bloqueio em (2,4)")
-print(qw.possible_moves())
-
-
-print("\n==============================")
-print("TESTE 8 — TURNOS")
-print("==============================")
-
-board = Board()
-
-rw = Rook("white", board, (7, 0))
-rb = Rook("black", board, (0, 0))
-
-board.place_piece(rw)
-board.place_piece(rb)
-
-print_board(board)
-
-print("Tentando mover preto fora do turno:")
-board.move_piece(rb, (1, 0))  # deve falhar
-
-board.move_piece(rw, (6, 0))  # válido
-print_board(board)
-
-print("Agora preto pode jogar:")
-board.move_piece(rb, (1, 0))
-print_board(board)
-
-
-print("\n==============================")
-print("TESTE 9 — PROMOÇÃO")
-print("==============================")
-
-board = Board()
-
-pw = Pawn("white", board, (1, 7))
-board.place_piece(pw)
-
-print_board(board)
-board.move_piece(pw, (0, 7))
-
-print("Esperado: ♛ branca")
-print_board(board)
-
-print("\n===== FIM DOS TESTES =====")
