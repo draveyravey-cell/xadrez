@@ -12,11 +12,6 @@ class Board: # Board é a classe que representa o tabuleiro de xadrez e controla
             "white": set(),
             "black": set()
         }
-    def __str__(self): # mostra o tabuleiro como string para Debug
-        str_board = ''
-        for row in self.board:
-            str_board += '|'.join(row) + '\n'
-        return str_board
     def place_piece(self, piece):
         self.pieces.append(piece)
         row, col = piece.position
@@ -230,7 +225,24 @@ class Queen(Piece):
         ])
     def symbol(self):
         return '♛' if self.color == "white" else '♕'
-    
+
+class Knight(Piece):
+    def possible_moves(self):
+        moves = []
+        row, col = self.position
+        deltas = [
+            (2, 1), (2, -1), (-2, 1), (-2, -1),
+            (1, 2), (1, -2), (-1, 2), (-1, -2)
+        ]
+        for dr, dc in deltas:
+            r, c = row + dr, col + dc
+            if 0 <= r < self.board.rows and 0 <= c < self.board.columns:
+                target = self.board.board[r][c]
+                if target is None or target.color != self.color:
+                    moves.append((r, c))
+        return moves
+    def symbol(self):
+        return '♞' if self.color == "white" else '♘'
 
 def print_board(board):
     print(" a b c d e f g h")
